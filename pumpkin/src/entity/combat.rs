@@ -1,6 +1,7 @@
 use std::sync::atomic::Ordering;
 
 use pumpkin_data::{
+    entity::EntityType,
     particle::Particle,
     sound::{Sound, SoundCategory},
 };
@@ -51,6 +52,11 @@ impl AttackType {
 }
 
 pub fn handle_knockback(attacker: &Entity, victim: &Entity, strength: f64) {
+    // Vanilla parity: armor stands do not receive melee knockback movement.
+    if victim.entity_type == &EntityType::ARMOR_STAND {
+        return;
+    }
+
     let yaw = attacker.yaw.load();
     victim.knockback(
         strength * 0.5,
