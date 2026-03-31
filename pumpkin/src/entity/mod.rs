@@ -19,6 +19,7 @@ use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::dimension::Dimension;
 use pumpkin_data::entity::EntityStatus;
 use pumpkin_data::fluid::Fluid;
+use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::meta_data_type::MetaDataType;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data::TrackedData;
@@ -50,7 +51,6 @@ use pumpkin_util::math::{
 };
 use pumpkin_util::text::TextComponent;
 use pumpkin_util::text::hover::HoverEvent;
-use pumpkin_world::item::ItemStack;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::pin::Pin;
@@ -93,14 +93,14 @@ pub mod predicate;
 #[must_use]
 pub const fn equipment_break_status(slot: &EquipmentSlot) -> EntityStatus {
     match slot {
-        EquipmentSlot::MainHand(_) => EntityStatus::BreakMainhand,
-        EquipmentSlot::OffHand(_) => EntityStatus::BreakOffhand,
-        EquipmentSlot::Head(_) => EntityStatus::BreakHead,
-        EquipmentSlot::Chest(_) => EntityStatus::BreakChest,
-        EquipmentSlot::Legs(_) => EntityStatus::BreakLegs,
-        EquipmentSlot::Feet(_) => EntityStatus::BreakFeet,
-        EquipmentSlot::Body(_) => EntityStatus::BreakBody,
-        EquipmentSlot::Saddle(_) => EntityStatus::BreakSaddle,
+        EquipmentSlot::MainHand(_) => EntityStatus::MainhandBreak,
+        EquipmentSlot::OffHand(_) => EntityStatus::OffhandBreak,
+        EquipmentSlot::Head(_) => EntityStatus::HeadBreak,
+        EquipmentSlot::Chest(_) => EntityStatus::ChestBreak,
+        EquipmentSlot::Legs(_) => EntityStatus::LegsBreak,
+        EquipmentSlot::Feet(_) => EntityStatus::FeetBreak,
+        EquipmentSlot::Body(_) => EntityStatus::BodyBreak,
+        EquipmentSlot::Saddle(_) => EntityStatus::SaddleBreak,
     }
 }
 
@@ -140,7 +140,7 @@ pub trait EntityBase: Send + Sync + NBTStorage {
             if is_baby {
                 entity
                     .send_meta_data(&[Metadata::new(
-                        TrackedData::DATA_BABY,
+                        TrackedData::BABY_ID,
                         MetaDataType::BOOLEAN,
                         true,
                     )])
@@ -607,7 +607,7 @@ impl Entity {
     /// Sets a custom name for the entity, typically used with nametags
     pub async fn set_custom_name(&self, name: TextComponent) {
         self.send_meta_data(&[Metadata::new(
-            TrackedData::DATA_CUSTOM_NAME,
+            TrackedData::CUSTOM_NAME,
             MetaDataType::OPTIONAL_TEXT_COMPONENT,
             Some(name),
         )])
@@ -1599,7 +1599,26 @@ impl Entity {
                 let source_axis = source_portal.as_ref().map(|p| p.axis);
                 drop(portal_manager);
 
-                let (teleport_pos, new_yaw) = if let Some(dest_result) =
+                let is_end_portal = dest_world.dimension == Dimension::THE_END
+                    || self.world.load().dimension == Dimension::THE_END;
+
+                let (teleport_pos, new_yaw) = if is_end_portal {
+                    if dest_world.dimension == Dimension::THE_END {
+                        // Entering the End: spawn on the obsidian platform at (100, 50, 0)
+                        (Vector3::new(100.5f64, 50.0f64, 0.5f64), None)
+                    } else {
+                        // Leaving the End through the exit portal: return to overworld spawn
+                        let info = dest_world.level_info.load();
+                        (
+                            Vector3::new(
+                                f64::from(info.spawn_x) + 0.5,
+                                f64::from(info.spawn_y),
+                                f64::from(info.spawn_z) + 0.5,
+                            ),
+                            None,
+                        )
+                    }
+                } else if let Some(dest_result) =
                     NetherPortal::search_for_portal(&dest_world, target_pos).await
                 {
                     let base_pos = source_portal.as_ref().map_or_else(
@@ -1871,7 +1890,7 @@ impl Entity {
         if new_frozen_ticks != old_frozen_ticks {
             self.frozen_ticks.store(new_frozen_ticks, Ordering::Relaxed);
             self.send_meta_data(&[Metadata::new(
-                TrackedData::DATA_FROZEN_TICKS,
+                TrackedData::TICKS_FROZEN,
                 MetaDataType::INTEGER,
                 VarInt(new_frozen_ticks),
             )])
@@ -2132,7 +2151,7 @@ impl Entity {
         }
         self.flags.store(b, Ordering::Relaxed);
         self.send_meta_data(&[Metadata::new(
-            TrackedData::DATA_FLAGS,
+            TrackedData::SHARED_FLAGS_ID,
             MetaDataType::BYTE,
             b,
         )])
@@ -2187,7 +2206,7 @@ impl Entity {
             self.entity_dimension.store(dimension);
             let pose = pose as i32;
             self.send_meta_data(&[Metadata::new(
-                TrackedData::DATA_POSE,
+                TrackedData::POSE,
                 MetaDataType::ENTITY_POSE,
                 VarInt(pose),
             )])
@@ -2811,14 +2830,14 @@ mod tests {
         // Status bytes from vanilla EntityEvent: mainhand=47, offhand=48,
         // head=49, chest=50, legs=51, feet=52, body=65, saddle=68.
         let cases: &[(&EquipmentSlot, u8)] = &[
-            (&EquipmentSlot::MAIN_HAND, EntityStatus::BreakMainhand as u8),
-            (&EquipmentSlot::OFF_HAND, EntityStatus::BreakOffhand as u8),
-            (&EquipmentSlot::HEAD, EntityStatus::BreakHead as u8),
-            (&EquipmentSlot::CHEST, EntityStatus::BreakChest as u8),
-            (&EquipmentSlot::LEGS, EntityStatus::BreakLegs as u8),
-            (&EquipmentSlot::FEET, EntityStatus::BreakFeet as u8),
-            (&EquipmentSlot::BODY, EntityStatus::BreakBody as u8),
-            (&EquipmentSlot::SADDLE, EntityStatus::BreakSaddle as u8),
+            (&EquipmentSlot::MAIN_HAND, EntityStatus::MainhandBreak as u8),
+            (&EquipmentSlot::OFF_HAND, EntityStatus::OffhandBreak as u8),
+            (&EquipmentSlot::HEAD, EntityStatus::HeadBreak as u8),
+            (&EquipmentSlot::CHEST, EntityStatus::ChestBreak as u8),
+            (&EquipmentSlot::LEGS, EntityStatus::LegsBreak as u8),
+            (&EquipmentSlot::FEET, EntityStatus::FeetBreak as u8),
+            (&EquipmentSlot::BODY, EntityStatus::BodyBreak as u8),
+            (&EquipmentSlot::SADDLE, EntityStatus::SaddleBreak as u8),
         ];
         for (i, (slot, expected)) in cases.iter().enumerate() {
             assert_eq!(

@@ -72,6 +72,7 @@ use crate::block::blocks::plant::spore_blossom::SporeBlossomBlock;
 use crate::block::blocks::plant::sugar_cane::SugarCaneBlock;
 use crate::block::blocks::plant::tall_plant::TallPlantBlock;
 use crate::block::blocks::plant::tall_seagrass::TallSeaGrassBlock;
+use crate::block::blocks::plant::weeping_vines::WeepingVinesBlock;
 use crate::block::blocks::plant::wither_rose::WitherRoseBlock;
 use crate::block::blocks::powder_snow::PowderSnowBlock;
 use crate::block::blocks::pumpkin::PumpkinBlock;
@@ -125,12 +126,12 @@ use crate::server::Server;
 use crate::world::World;
 use pumpkin_data::fluid::Fluid;
 use pumpkin_data::item::Item;
+use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::{Block, BlockDirection, BlockState};
 use pumpkin_protocol::java::server::play::SUseItemOn;
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_world::BlockStateId;
-use pumpkin_world::item::ItemStack;
 use pumpkin_world::world::{BlockAccessor, BlockFlags, BlockRegistryExt};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
@@ -270,6 +271,7 @@ pub fn default_registry() -> Arc<BlockRegistry> {
     manager.register(SporeBlossomBlock);
     manager.register(ConduitBlock);
     manager.register(DripstoneBlock);
+    manager.register(WeepingVinesBlock);
 
     manager.register(FallingBlock);
 
